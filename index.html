@@ -543,13 +543,7 @@
 <div class="layout">
   <aside class="sidebar">
     <h2>Pult-Vorlage</h2>
-    <div class="preset-buttons">
-      <button class="preset-btn" onclick="loadPreset('x32')">Behringer X32 (32ch)</button>
-      <button class="preset-btn" onclick="loadPreset('x32compact')">X32 Compact (16+16)</button>
-      <button class="preset-btn" onclick="loadPreset('x32rack')">X32 Rack</button>
-      <button class="preset-btn" onclick="loadPreset('wing')">Behringer Wing (48ch)</button>
-      <button class="preset-btn" onclick="loadPreset('custom')">Benutzerdefiniert</button>
-    </div>
+    <div class="preset-buttons" id="presetButtons"></div>
 
     <h2>Konfiguration</h2>
     <div class="config-group">
@@ -591,7 +585,11 @@
     <div class="config-group">
       <div class="config-row">
         <label>Lokale Inputs</label>
-        <input type="number" id="cfgLocalIn" value="32" min="0" max="32">
+        <input type="number" id="cfgLocalIn" value="32" min="0" max="48">
+      </div>
+      <div class="config-row">
+        <label>Lokale Aux In</label>
+        <input type="number" id="cfgLocalAuxIn" value="6" min="0" max="8">
       </div>
       <div class="config-row">
         <label>AES50-A Inputs</label>
@@ -602,8 +600,16 @@
         <input type="number" id="cfgAES50B" value="48" min="0" max="48">
       </div>
       <div class="config-row">
+        <label>AES50-C Inputs</label>
+        <input type="number" id="cfgAES50C" value="0" min="0" max="48">
+      </div>
+      <div class="config-row">
         <label>USB/Card Inputs</label>
-        <input type="number" id="cfgUSBIn" value="32" min="0" max="32">
+        <input type="number" id="cfgUSBIn" value="32" min="0" max="48">
+      </div>
+      <div class="config-row">
+        <label>Lokale Outputs</label>
+        <input type="number" id="cfgLocalOut" value="16" min="0" max="24">
       </div>
     </div>
 
@@ -723,30 +729,63 @@ function getConfig() {
     dca: parseInt(document.getElementById('cfgDCA').value),
     main: document.getElementById('cfgMain').value,
     localIn: parseInt(document.getElementById('cfgLocalIn').value),
+    localAuxIn: parseInt(document.getElementById('cfgLocalAuxIn').value),
     aes50a: parseInt(document.getElementById('cfgAES50A').value),
     aes50b: parseInt(document.getElementById('cfgAES50B').value),
+    aes50c: parseInt(document.getElementById('cfgAES50C').value),
     usbIn: parseInt(document.getElementById('cfgUSBIn').value),
+    localOut: parseInt(document.getElementById('cfgLocalOut').value),
   };
 }
 
 function getInputSources(cfg) {
   let sources = [{value:'', label:'-- Nicht zugewiesen --'}];
   for (let i = 1; i <= cfg.localIn; i++) sources.push({value:`local-${i}`, label:`Local In ${i}`});
+  for (let i = 1; i <= cfg.localAuxIn; i++) sources.push({value:`aux-in-${i}`, label:`Local Aux In ${i}`});
   for (let i = 1; i <= cfg.aes50a; i++) sources.push({value:`aes50a-${i}`, label:`AES50-A ${i}`});
   for (let i = 1; i <= cfg.aes50b; i++) sources.push({value:`aes50b-${i}`, label:`AES50-B ${i}`});
+  for (let i = 1; i <= cfg.aes50c; i++) sources.push({value:`aes50c-${i}`, label:`AES50-C ${i}`});
   for (let i = 1; i <= cfg.usbIn; i++) sources.push({value:`usb-${i}`, label:`USB/Card ${i}`});
   return sources;
 }
 
+const PRESETS = {
+  x32:         { label:'Behringer X32',          channels:32, aux:8, mixBus:16, fxBus:8, matrix:6, dca:8, main:'lcr', localIn:32, localAuxIn:6, aes50a:48, aes50b:48, aes50c:0, usbIn:32, localOut:16, category:'X32' },
+  x32compact:  { label:'X32 Compact',            channels:32, aux:8, mixBus:16, fxBus:8, matrix:6, dca:8, main:'lcr', localIn:16, localAuxIn:6, aes50a:48, aes50b:48, aes50c:0, usbIn:32, localOut:16, category:'X32' },
+  x32producer: { label:'X32 Producer',           channels:32, aux:8, mixBus:16, fxBus:8, matrix:6, dca:8, main:'lcr', localIn:16, localAuxIn:6, aes50a:48, aes50b:48, aes50c:0, usbIn:32, localOut:8,  category:'X32' },
+  x32rack:     { label:'X32 Rack',               channels:32, aux:8, mixBus:16, fxBus:8, matrix:6, dca:8, main:'lcr', localIn:16, localAuxIn:6, aes50a:48, aes50b:48, aes50c:0, usbIn:32, localOut:8,  category:'X32' },
+  x32core:     { label:'X32 Core',               channels:32, aux:8, mixBus:16, fxBus:8, matrix:6, dca:8, main:'lcr', localIn:0,  localAuxIn:0, aes50a:48, aes50b:48, aes50c:0, usbIn:32, localOut:0,  category:'X32' },
+  wing:        { label:'Behringer Wing',         channels:48, aux:8, mixBus:16, fxBus:16,matrix:8, dca:8, main:'stereo', localIn:8,  localAuxIn:8, aes50a:48, aes50b:48, aes50c:48, usbIn:48, localOut:8,  category:'Wing' },
+  wingcompact: { label:'Wing Compact',           channels:48, aux:8, mixBus:16, fxBus:16,matrix:8, dca:8, main:'stereo', localIn:24, localAuxIn:8, aes50a:48, aes50b:48, aes50c:48, usbIn:48, localOut:8,  category:'Wing' },
+  wingrack:    { label:'Wing Rack',              channels:48, aux:8, mixBus:16, fxBus:16,matrix:8, dca:8, main:'stereo', localIn:24, localAuxIn:8, aes50a:48, aes50b:48, aes50c:48, usbIn:48, localOut:8,  category:'Wing' },
+  xr18:        { label:'X Air XR18',             channels:18, aux:0, mixBus:6,  fxBus:4, matrix:0, dca:8, main:'stereo', localIn:16, localAuxIn:2, aes50a:0,  aes50b:0,  aes50c:0, usbIn:18, localOut:8,  category:'X Air' },
+  xr16:        { label:'X Air XR16',             channels:16, aux:0, mixBus:6,  fxBus:4, matrix:0, dca:8, main:'stereo', localIn:8,  localAuxIn:8, aes50a:0,  aes50b:0,  aes50c:0, usbIn:2,  localOut:6,  category:'X Air' },
+  xr12:        { label:'X Air XR12',             channels:12, aux:0, mixBus:6,  fxBus:4, matrix:0, dca:8, main:'stereo', localIn:4,  localAuxIn:8, aes50a:0,  aes50b:0,  aes50c:0, usbIn:2,  localOut:4,  category:'X Air' },
+  custom:      { label:'Benutzerdefiniert',      channels:32, aux:8, mixBus:16, fxBus:8, matrix:6, dca:8, main:'stereo', localIn:32, localAuxIn:6, aes50a:48, aes50b:48, aes50c:0, usbIn:32, localOut:16, category:'' },
+};
+
+function buildPresetButtons() {
+  const container = document.getElementById('presetButtons');
+  let lastCat = '';
+  for (const [key, p] of Object.entries(PRESETS)) {
+    if (p.category && p.category !== lastCat) {
+      const catLabel = document.createElement('div');
+      catLabel.style.cssText = 'font-size:0.7rem;color:var(--text-dim);margin-top:8px;margin-bottom:2px;text-transform:uppercase;letter-spacing:1px;';
+      catLabel.textContent = p.category;
+      container.appendChild(catLabel);
+      lastCat = p.category;
+    }
+    const btn = document.createElement('button');
+    btn.className = 'preset-btn';
+    btn.textContent = p.label;
+    btn.onclick = () => loadPreset(key);
+    container.appendChild(btn);
+  }
+}
+
 function loadPreset(name) {
-  const presets = {
-    x32:        { channels:32, aux:8, mixBus:16, fxBus:8, matrix:6, dca:8, main:'stereo', localIn:32, aes50a:48, aes50b:48, usbIn:32 },
-    x32compact: { channels:32, aux:8, mixBus:16, fxBus:8, matrix:6, dca:8, main:'stereo', localIn:16, aes50a:48, aes50b:48, usbIn:32 },
-    x32rack:    { channels:32, aux:8, mixBus:16, fxBus:8, matrix:6, dca:8, main:'stereo', localIn:16, aes50a:48, aes50b:48, usbIn:32 },
-    wing:       { channels:48, aux:8, mixBus:16, fxBus:8, matrix:8, dca:8, main:'stereo', localIn:8, aes50a:48, aes50b:48, usbIn:48 },
-    custom:     { channels:32, aux:8, mixBus:16, fxBus:8, matrix:6, dca:8, main:'stereo', localIn:32, aes50a:48, aes50b:48, usbIn:32 },
-  };
-  const p = presets[name];
+  const p = PRESETS[name];
+  if (!p) return;
   document.getElementById('cfgChannels').value = p.channels;
   document.getElementById('cfgAux').value = p.aux;
   document.getElementById('cfgMixBus').value = p.mixBus;
@@ -755,9 +794,12 @@ function loadPreset(name) {
   document.getElementById('cfgDCA').value = p.dca;
   document.getElementById('cfgMain').value = p.main;
   document.getElementById('cfgLocalIn').value = p.localIn;
+  document.getElementById('cfgLocalAuxIn').value = p.localAuxIn;
   document.getElementById('cfgAES50A').value = p.aes50a;
   document.getElementById('cfgAES50B').value = p.aes50b;
+  document.getElementById('cfgAES50C').value = p.aes50c;
   document.getElementById('cfgUSBIn').value = p.usbIn;
+  document.getElementById('cfgLocalOut').value = p.localOut;
   rebuildAll();
 }
 
@@ -895,9 +937,11 @@ function buildOutputs(cfg) {
   let html = '';
 
   const outputs = [];
-  for (let i = 1; i <= 16; i++) outputs.push({id:`out${i}`, label:`Output ${i}`});
-  for (let i = 1; i <= 6; i++) outputs.push({id:`aes50a-out${i}`, label:`AES50-A Out ${i}`});
-  for (let i = 1; i <= 6; i++) outputs.push({id:`aes50b-out${i}`, label:`AES50-B Out ${i}`});
+  for (let i = 1; i <= cfg.localOut; i++) outputs.push({id:`out${i}`, label:`Output ${i}`});
+  if (cfg.aes50a > 0) for (let i = 1; i <= 48; i++) outputs.push({id:`aes50a-out${i}`, label:`AES50-A Out ${i}`});
+  if (cfg.aes50b > 0) for (let i = 1; i <= 48; i++) outputs.push({id:`aes50b-out${i}`, label:`AES50-B Out ${i}`});
+  if (cfg.aes50c > 0) for (let i = 1; i <= 48; i++) outputs.push({id:`aes50c-out${i}`, label:`AES50-C Out ${i}`});
+  if (cfg.usbIn > 0) for (let i = 1; i <= cfg.usbIn; i++) outputs.push({id:`usb-out${i}`, label:`USB/Card Out ${i}`});
 
   const busOptions = [];
   busOptions.push('<option value="">-- Frei --</option>');
@@ -999,6 +1043,7 @@ function exportJSON() {
 
 // Init
 document.getElementById('eventDate').value = new Date().toISOString().split('T')[0];
+buildPresetButtons();
 rebuildAll();
 </script>
 
