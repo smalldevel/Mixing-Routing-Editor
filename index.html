@@ -545,6 +545,13 @@
     <h2>Pult-Vorlage</h2>
     <div class="preset-buttons" id="presetButtons"></div>
 
+    <h2>Kanal-Vorlage</h2>
+    <div class="preset-buttons" id="channelPresetButtons"></div>
+    <div style="margin-top:8px;display:flex;gap:4px;">
+      <button style="font-size:0.75rem;flex:1;" onclick="saveChannelPreset()">Aktuelle speichern</button>
+      <button style="font-size:0.75rem;flex:1;" onclick="clearChannels()">Alle leeren</button>
+    </div>
+
     <h2>Konfiguration</h2>
     <div class="config-group">
       <div class="config-row">
@@ -763,6 +770,272 @@ const PRESETS = {
   xr12:        { label:'X Air XR12',             channels:12, aux:0, mixBus:6,  fxBus:4, matrix:0, dca:8, main:'stereo', localIn:4,  localAuxIn:8, aes50a:0,  aes50b:0,  aes50c:0, usbIn:2,  localOut:4,  category:'X Air' },
   custom:      { label:'Benutzerdefiniert',      channels:32, aux:8, mixBus:16, fxBus:8, matrix:6, dca:8, main:'stereo', localIn:32, localAuxIn:6, aes50a:48, aes50b:48, aes50c:0, usbIn:32, localOut:16, category:'' },
 };
+
+const CHANNEL_PRESETS = {
+  rockband: {
+    label: 'Rockband (20ch)',
+    category: 'Band',
+    channels: [
+      { name:'Kick',     color:'#e94560', notes:'Beta 52A / e902',  phantom:false },
+      { name:'Snare T',  color:'#e94560', notes:'SM57',             phantom:false },
+      { name:'Snare B',  color:'#e94560', notes:'SM57',             phantom:false },
+      { name:'HiHat',    color:'#e94560', notes:'KM184 / C451',     phantom:true  },
+      { name:'Tom 1',    color:'#e94560', notes:'e604 / MD421',     phantom:false },
+      { name:'Tom 2',    color:'#e94560', notes:'e604 / MD421',     phantom:false },
+      { name:'Floor T',  color:'#e94560', notes:'e604 / MD421',     phantom:false },
+      { name:'OH L',     color:'#e94560', notes:'C414 / KM184',     phantom:true  },
+      { name:'OH R',     color:'#e94560', notes:'C414 / KM184',     phantom:true  },
+      { name:'Bass DI',  color:'#ff9f43', notes:'DI-Box',           phantom:false },
+      { name:'Bass Amp', color:'#ff9f43', notes:'e906 / SM57',      phantom:false },
+      { name:'Git L',    color:'#6fcf97', notes:'SM57 / e906',      phantom:false },
+      { name:'Git R',    color:'#6fcf97', notes:'SM57 / e906',      phantom:false },
+      { name:'Keys L',   color:'#f5c542', notes:'DI stereo',        phantom:false },
+      { name:'Keys R',   color:'#f5c542', notes:'DI stereo',        phantom:false },
+      { name:'Voc Lead', color:'#00b4d8', notes:'SM58 / Beta 58',   phantom:false },
+      { name:'Voc BG 1', color:'#48dbfb', notes:'SM58',             phantom:false },
+      { name:'Voc BG 2', color:'#48dbfb', notes:'SM58',             phantom:false },
+      { name:'Voc BG 3', color:'#48dbfb', notes:'SM58',             phantom:false },
+      { name:'Acou Gt',  color:'#6fcf97', notes:'DI / Pickup',      phantom:true  },
+    ]
+  },
+  acoustic: {
+    label: 'Akustik / Unplugged (12ch)',
+    category: 'Band',
+    channels: [
+      { name:'Voc 1',    color:'#00b4d8', notes:'SM58 / Beta 58',   phantom:false },
+      { name:'Voc 2',    color:'#48dbfb', notes:'SM58',             phantom:false },
+      { name:'A-Git 1',  color:'#6fcf97', notes:'DI + Mikro',       phantom:true  },
+      { name:'A-Git 2',  color:'#6fcf97', notes:'DI + Mikro',       phantom:true  },
+      { name:'Keys L',   color:'#f5c542', notes:'DI stereo',        phantom:false },
+      { name:'Keys R',   color:'#f5c542', notes:'DI stereo',        phantom:false },
+      { name:'Bass DI',  color:'#ff9f43', notes:'DI-Box',           phantom:false },
+      { name:'Cajon',    color:'#e94560', notes:'Beta 91A / SM57',  phantom:true  },
+      { name:'Perc',     color:'#e94560', notes:'SM81 / C451',      phantom:true  },
+      { name:'Violin',   color:'#bb86fc', notes:'DI / Clip Mic',    phantom:true  },
+      { name:'Cello',    color:'#bb86fc', notes:'DI / C414',        phantom:true  },
+      { name:'Flöte',    color:'#bb86fc', notes:'KM184',            phantom:true  },
+    ]
+  },
+  bigband: {
+    label: 'Big Band (28ch)',
+    category: 'Band',
+    channels: [
+      { name:'Kick',     color:'#e94560', notes:'Beta 52A',         phantom:false },
+      { name:'Snare',    color:'#e94560', notes:'SM57',             phantom:false },
+      { name:'HiHat',    color:'#e94560', notes:'KM184',            phantom:true  },
+      { name:'OH L',     color:'#e94560', notes:'C414',             phantom:true  },
+      { name:'OH R',     color:'#e94560', notes:'C414',             phantom:true  },
+      { name:'Bass DI',  color:'#ff9f43', notes:'DI-Box',           phantom:false },
+      { name:'Piano L',  color:'#f5c542', notes:'C414 / DI',        phantom:true  },
+      { name:'Piano R',  color:'#f5c542', notes:'C414 / DI',        phantom:true  },
+      { name:'Git',      color:'#6fcf97', notes:'SM57 / DI',        phantom:false },
+      { name:'Trp 1',    color:'#ff9f43', notes:'SM57 / e604',      phantom:false },
+      { name:'Trp 2',    color:'#ff9f43', notes:'SM57 / e604',      phantom:false },
+      { name:'Trp 3',    color:'#ff9f43', notes:'SM57 / e604',      phantom:false },
+      { name:'Trp 4',    color:'#ff9f43', notes:'SM57 / e604',      phantom:false },
+      { name:'Pos 1',    color:'#f5c542', notes:'SM57 / MD421',     phantom:false },
+      { name:'Pos 2',    color:'#f5c542', notes:'SM57 / MD421',     phantom:false },
+      { name:'Pos 3',    color:'#f5c542', notes:'SM57 / MD421',     phantom:false },
+      { name:'Pos 4',    color:'#f5c542', notes:'SM57 / MD421',     phantom:false },
+      { name:'Alt Sx 1', color:'#6fcf97', notes:'SM57 / C414',      phantom:false },
+      { name:'Alt Sx 2', color:'#6fcf97', notes:'SM57 / C414',      phantom:false },
+      { name:'Ten Sx 1', color:'#6fcf97', notes:'SM57 / C414',      phantom:false },
+      { name:'Ten Sx 2', color:'#6fcf97', notes:'SM57 / C414',      phantom:false },
+      { name:'Bar Sx',   color:'#6fcf97', notes:'SM57 / C414',      phantom:false },
+      { name:'Voc Lead', color:'#00b4d8', notes:'SM58 / Beta 58',   phantom:false },
+      { name:'Voc BG 1', color:'#48dbfb', notes:'SM58',             phantom:false },
+      { name:'Voc BG 2', color:'#48dbfb', notes:'SM58',             phantom:false },
+      { name:'Voc BG 3', color:'#48dbfb', notes:'SM58',             phantom:false },
+      { name:'Voc BG 4', color:'#48dbfb', notes:'SM58',             phantom:false },
+      { name:'Voc BG 5', color:'#48dbfb', notes:'SM58',             phantom:false },
+    ]
+  },
+  church: {
+    label: 'Kirche / Gottesdienst (16ch)',
+    category: 'Veranstaltung',
+    channels: [
+      { name:'Pastor',   color:'#00b4d8', notes:'Headset / Ansteck', phantom:true  },
+      { name:'Sprecher', color:'#48dbfb', notes:'SM58 / Pult',      phantom:false },
+      { name:'Chor L',   color:'#bb86fc', notes:'C414 / KM184',     phantom:true  },
+      { name:'Chor R',   color:'#bb86fc', notes:'C414 / KM184',     phantom:true  },
+      { name:'Orgel L',  color:'#f5c542', notes:'DI / Mikro',       phantom:true  },
+      { name:'Orgel R',  color:'#f5c542', notes:'DI / Mikro',       phantom:true  },
+      { name:'Piano L',  color:'#f5c542', notes:'DI stereo',        phantom:false },
+      { name:'Piano R',  color:'#f5c542', notes:'DI stereo',        phantom:false },
+      { name:'A-Git',    color:'#6fcf97', notes:'DI / Pickup',      phantom:true  },
+      { name:'Bass DI',  color:'#ff9f43', notes:'DI-Box',           phantom:false },
+      { name:'Cajon',    color:'#e94560', notes:'Beta 91A',          phantom:true  },
+      { name:'Voc 1',    color:'#00b4d8', notes:'SM58',             phantom:false },
+      { name:'Voc 2',    color:'#00b4d8', notes:'SM58',             phantom:false },
+      { name:'Voc 3',    color:'#00b4d8', notes:'SM58',             phantom:false },
+      { name:'Ambient L',color:'#fff',    notes:'Raummikro',        phantom:true  },
+      { name:'Ambient R',color:'#fff',    notes:'Raummikro',        phantom:true  },
+    ]
+  },
+  theater: {
+    label: 'Theater / Musical (24ch)',
+    category: 'Veranstaltung',
+    channels: [
+      { name:'Actor 1',  color:'#00b4d8', notes:'DPA 4066 Headset', phantom:true  },
+      { name:'Actor 2',  color:'#00b4d8', notes:'DPA 4066 Headset', phantom:true  },
+      { name:'Actor 3',  color:'#48dbfb', notes:'DPA 4066 Headset', phantom:true  },
+      { name:'Actor 4',  color:'#48dbfb', notes:'DPA 4066 Headset', phantom:true  },
+      { name:'Actor 5',  color:'#48dbfb', notes:'DPA 4066 Headset', phantom:true  },
+      { name:'Actor 6',  color:'#48dbfb', notes:'DPA 4066 Headset', phantom:true  },
+      { name:'Actor 7',  color:'#bb86fc', notes:'DPA 4066 Headset', phantom:true  },
+      { name:'Actor 8',  color:'#bb86fc', notes:'DPA 4066 Headset', phantom:true  },
+      { name:'Handheld', color:'#fff',    notes:'Funkmikro',        phantom:false },
+      { name:'Ansage',   color:'#fff',    notes:'SM58 / Pult',      phantom:false },
+      { name:'Stage L',  color:'#6fcf97', notes:'Grenzfläche',      phantom:true  },
+      { name:'Stage R',  color:'#6fcf97', notes:'Grenzfläche',      phantom:true  },
+      { name:'FX Mic',   color:'#e94560', notes:'Spot-Mikro',       phantom:true  },
+      { name:'Playb L',  color:'#f5c542', notes:'Zuspiel stereo',   phantom:false },
+      { name:'Playb R',  color:'#f5c542', notes:'Zuspiel stereo',   phantom:false },
+      { name:'Keys L',   color:'#f5c542', notes:'DI stereo',        phantom:false },
+      { name:'Keys R',   color:'#f5c542', notes:'DI stereo',        phantom:false },
+      { name:'Drums L',  color:'#e94560', notes:'Submix / OH',      phantom:true  },
+      { name:'Drums R',  color:'#e94560', notes:'Submix / OH',      phantom:true  },
+      { name:'Bass DI',  color:'#ff9f43', notes:'DI-Box',           phantom:false },
+      { name:'Git',      color:'#6fcf97', notes:'SM57 / DI',        phantom:false },
+      { name:'Strings L',color:'#bb86fc', notes:'DI / Mikro',       phantom:true  },
+      { name:'Strings R',color:'#bb86fc', notes:'DI / Mikro',       phantom:true  },
+      { name:'Click',    color:'#e94560', notes:'nur Monitor',      phantom:false },
+    ]
+  },
+  conference: {
+    label: 'Konferenz / Vortrag (8ch)',
+    category: 'Veranstaltung',
+    channels: [
+      { name:'Redner 1', color:'#00b4d8', notes:'Headset / Ansteck', phantom:true  },
+      { name:'Redner 2', color:'#48dbfb', notes:'Headset / Ansteck', phantom:true  },
+      { name:'Pult Mic', color:'#fff',    notes:'Schwanenhals',     phantom:true  },
+      { name:'Handheld', color:'#6fcf97', notes:'Funkmikro Q&A',    phantom:false },
+      { name:'Laptop 1', color:'#f5c542', notes:'DI / Klinke',      phantom:false },
+      { name:'Laptop 2', color:'#f5c542', notes:'DI / Klinke',      phantom:false },
+      { name:'Video L',  color:'#ff9f43', notes:'Zuspiel stereo',   phantom:false },
+      { name:'Video R',  color:'#ff9f43', notes:'Zuspiel stereo',   phantom:false },
+    ]
+  },
+  djlive: {
+    label: 'DJ + Live Acts (10ch)',
+    category: 'Veranstaltung',
+    channels: [
+      { name:'DJ 1 L',   color:'#e94560', notes:'CDJ / Controller', phantom:false },
+      { name:'DJ 1 R',   color:'#e94560', notes:'CDJ / Controller', phantom:false },
+      { name:'DJ 2 L',   color:'#ff9f43', notes:'CDJ / Controller', phantom:false },
+      { name:'DJ 2 R',   color:'#ff9f43', notes:'CDJ / Controller', phantom:false },
+      { name:'MC Mic',   color:'#00b4d8', notes:'SM58',             phantom:false },
+      { name:'Laptop L', color:'#f5c542', notes:'DI stereo',        phantom:false },
+      { name:'Laptop R', color:'#f5c542', notes:'DI stereo',        phantom:false },
+      { name:'Synth L',  color:'#bb86fc', notes:'DI stereo',        phantom:false },
+      { name:'Synth R',  color:'#bb86fc', notes:'DI stereo',        phantom:false },
+      { name:'Ambient',  color:'#fff',    notes:'Raummikro',        phantom:true  },
+    ]
+  },
+};
+
+let userChannelPresets = JSON.parse(localStorage.getItem('mre-channel-presets') || '{}');
+
+function buildChannelPresetButtons() {
+  const container = document.getElementById('channelPresetButtons');
+  container.innerHTML = '';
+  let lastCat = '';
+
+  for (const [key, p] of Object.entries(CHANNEL_PRESETS)) {
+    if (p.category !== lastCat) {
+      const catLabel = document.createElement('div');
+      catLabel.style.cssText = 'font-size:0.7rem;color:var(--text-dim);margin-top:8px;margin-bottom:2px;text-transform:uppercase;letter-spacing:1px;';
+      catLabel.textContent = p.category;
+      container.appendChild(catLabel);
+      lastCat = p.category;
+    }
+    const btn = document.createElement('button');
+    btn.className = 'preset-btn';
+    btn.textContent = p.label;
+    btn.onclick = () => loadChannelPreset(key);
+    container.appendChild(btn);
+  }
+
+  const userKeys = Object.keys(userChannelPresets);
+  if (userKeys.length > 0) {
+    const catLabel = document.createElement('div');
+    catLabel.style.cssText = 'font-size:0.7rem;color:var(--text-dim);margin-top:8px;margin-bottom:2px;text-transform:uppercase;letter-spacing:1px;';
+    catLabel.textContent = 'Eigene';
+    container.appendChild(catLabel);
+    userKeys.forEach(key => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;gap:2px;';
+      const btn = document.createElement('button');
+      btn.className = 'preset-btn';
+      btn.style.flex = '1';
+      btn.textContent = `${key} (${userChannelPresets[key].length}ch)`;
+      btn.onclick = () => loadChannelPreset(key, true);
+      const del = document.createElement('button');
+      del.className = 'preset-btn';
+      del.style.cssText = 'width:28px;flex:none;color:var(--accent);';
+      del.textContent = '×';
+      del.title = 'Löschen';
+      del.onclick = () => { delete userChannelPresets[key]; localStorage.setItem('mre-channel-presets', JSON.stringify(userChannelPresets)); buildChannelPresetButtons(); };
+      row.appendChild(btn);
+      row.appendChild(del);
+      container.appendChild(row);
+    });
+  }
+}
+
+function loadChannelPreset(key, isUser) {
+  const preset = isUser ? { channels: userChannelPresets[key] } : CHANNEL_PRESETS[key];
+  if (!preset) return;
+  const cfg = getConfig();
+  const chData = preset.channels;
+
+  state.channels = [];
+  for (let i = 0; i < cfg.channels; i++) {
+    if (i < chData.length) {
+      state.channels.push({
+        name: chData[i].name,
+        source: i < cfg.localIn ? `local-${i+1}` : '',
+        color: chData[i].color || COLORS[i % COLORS.length],
+        phantom: chData[i].phantom || false,
+        notes: chData[i].notes || ''
+      });
+    } else {
+      state.channels.push({
+        name: `Ch ${i+1}`,
+        source: i < cfg.localIn ? `local-${i+1}` : '',
+        color: COLORS[i % COLORS.length],
+        phantom: false,
+        notes: ''
+      });
+    }
+  }
+  rebuildAll();
+}
+
+function saveChannelPreset() {
+  const name = prompt('Name für das Kanal-Preset:');
+  if (!name) return;
+  userChannelPresets[name] = state.channels.map(ch => ({
+    name: ch.name, color: ch.color, phantom: ch.phantom, notes: ch.notes
+  }));
+  localStorage.setItem('mre-channel-presets', JSON.stringify(userChannelPresets));
+  buildChannelPresetButtons();
+}
+
+function clearChannels() {
+  const cfg = getConfig();
+  state.channels = [];
+  for (let i = 0; i < cfg.channels; i++) {
+    state.channels.push({
+      name: `Ch ${i+1}`,
+      source: '',
+      color: COLORS[i % COLORS.length],
+      phantom: false,
+      notes: ''
+    });
+  }
+  rebuildAll();
+}
 
 function buildPresetButtons() {
   const container = document.getElementById('presetButtons');
@@ -1044,6 +1317,7 @@ function exportJSON() {
 // Init
 document.getElementById('eventDate').value = new Date().toISOString().split('T')[0];
 buildPresetButtons();
+buildChannelPresetButtons();
 rebuildAll();
 </script>
 
