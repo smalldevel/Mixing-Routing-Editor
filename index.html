@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mixing Routing Editor</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --surface2: #0f3460;
+    --accent: #e94560;
+    --accent2: #00b4d8;
+    --text: #eee;
+    --text-dim: #999;
+    --channel: #2a2a4a;
+    --bus-mix: #1b4332;
+    --bus-fx: #4a1942;
+    --bus-mtx: #3d2c0a;
+    --bus-main: #4a1a1a;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  header {
+    background: var(--surface);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 2px solid var(--accent);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  header h1 {
+    font-size: 1.3rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  header h1 .logo {
+    width: 28px; height: 28px;
+    background: var(--accent);
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: bold; font-size: 14px;
+  }
+
+  .header-actions { display: flex; gap: 8px; }
+
+  button {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid #444;
+    padding: 6px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background 0.2s;
+  }
+  button:hover { background: var(--accent); border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); }
+  button.primary:hover { background: #c73a52; }
+
+  .layout {
+    display: flex;
+    height: calc(100vh - 52px);
+  }
+
+  .sidebar {
+    width: 280px;
+    min-width: 280px;
+    background: var(--surface);
+    padding: 16px;
+    overflow-y: auto;
+    border-right: 1px solid #333;
+  }
+
+  .sidebar h2 {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--accent);
+    margin-bottom: 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #333;
+  }
+
+  .config-group {
+    margin-bottom: 20px;
+  }
+
+  .config-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .config-row label {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+  }
+
+  .config-row input, .config-row select {
+    width: 70px;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid #444;
+    padding: 4px 8px;
+    border-radius: 3px;
+    text-align: center;
+  }
+
+  select {
+    width: auto;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid #444;
+    padding: 4px 8px;
+    border-radius: 3px;
+  }
+
+  .preset-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 16px;
+  }
+
+  .preset-btn {
+    font-size: 0.8rem;
+    text-align: left;
+    padding: 8px 10px;
+    background: var(--bg);
+  }
+
+  .main-area {
+    flex: 1;
+    overflow: auto;
+    padding: 20px;
+  }
+
+  .section-title {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+    padding: 4px 10px;
+    border-radius: 3px;
+    display: inline-block;
+  }
+
+  .channels-section { margin-bottom: 30px; }
+
+  .channels-strip {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    padding-bottom: 10px;
+  }
+
+  .channel-strip {
+    min-width: 90px;
+    max-width: 90px;
+    background: var(--channel);
+    border-radius: 6px;
+    padding: 8px 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    border: 2px solid transparent;
+    transition: border-color 0.2s;
+    cursor: grab;
+    user-select: none;
+  }
+
+  .channel-strip:hover { border-color: var(--accent2); }
+  .channel-strip.dragging { opacity: 0.5; border-color: var(--accent); }
+  .channel-strip.selected { border-color: var(--accent); }
+
+  .ch-number {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    width: 100%;
+    text-align: center;
+  }
+
+  .ch-name {
+    width: 100%;
+    background: #111;
+    color: #0f0;
+    border: none;
+    text-align: center;
+    font-size: 0.75rem;
+    padding: 3px;
+    border-radius: 2px;
+    font-family: 'Courier New', monospace;
+  }
+
+  .ch-color {
+    width: 100%;
+    height: 4px;
+    border-radius: 2px;
+  }
+
+  .ch-input-select {
+    width: 100%;
+    font-size: 0.65rem;
+    padding: 2px;
+    background: #222;
+    color: var(--text);
+    border: 1px solid #444;
+    border-radius: 2px;
+  }
+
+  .ch-fader-track {
+    width: 8px;
+    height: 60px;
+    background: #111;
+    border-radius: 4px;
+    position: relative;
+    margin: 4px 0;
+  }
+
+  .ch-fader-knob {
+    width: 20px;
+    height: 8px;
+    background: #ccc;
+    border-radius: 2px;
+    position: absolute;
+    left: 50%;
+    bottom: 75%;
+    transform: translateX(-50%);
+    cursor: ns-resize;
+  }
+
+  .ch-meter {
+    width: 6px;
+    height: 60px;
+    background: #111;
+    border-radius: 3px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .ch-meter-fill {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    border-radius: 3px;
+    background: linear-gradient(to top, #0f0, #ff0 70%, #f00 95%);
+  }
+
+  .routing-matrix {
+    margin-top: 20px;
+    overflow-x: auto;
+  }
+
+  .matrix-table {
+    border-collapse: collapse;
+    font-size: 0.75rem;
+  }
+
+  .matrix-table th, .matrix-table td {
+    padding: 4px 6px;
+    border: 1px solid #333;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .matrix-table th {
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+
+  .matrix-table th.row-header {
+    position: sticky;
+    left: 0;
+    z-index: 3;
+    text-align: left;
+    min-width: 100px;
+  }
+
+  .matrix-table td.row-header {
+    background: var(--surface);
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    text-align: left;
+    font-weight: 500;
+  }
+
+  .matrix-cell {
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
+    transition: background 0.15s;
+    position: relative;
+  }
+
+  .matrix-cell:hover { background: #333 !important; }
+
+  .matrix-cell.active {
+    background: var(--accent2) !important;
+  }
+
+  .matrix-cell.active::after {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 10px; height: 10px;
+    background: #fff;
+    border-radius: 50%;
+  }
+
+  .bus-header-mix { background: var(--bus-mix) !important; color: #6fcf97; }
+  .bus-header-fx { background: var(--bus-fx) !important; color: #bb86fc; }
+  .bus-header-mtx { background: var(--bus-mtx) !important; color: #f5c542; }
+  .bus-header-main { background: var(--bus-main) !important; color: var(--accent); }
+
+  .routing-legend {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+  }
+
+  .legend-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+  }
+
+  .output-section {
+    margin-top: 30px;
+    padding: 16px;
+    background: var(--surface);
+    border-radius: 8px;
+  }
+
+  .output-section h3 {
+    font-size: 0.9rem;
+    margin-bottom: 12px;
+    color: var(--accent2);
+  }
+
+  .output-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 8px;
+  }
+
+  .output-slot {
+    background: var(--bg);
+    padding: 8px;
+    border-radius: 4px;
+    text-align: center;
+    font-size: 0.75rem;
+    border: 1px dashed #444;
+    min-height: 60px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+  }
+
+  .output-slot .out-label {
+    color: var(--text-dim);
+    font-size: 0.65rem;
+    text-transform: uppercase;
+  }
+
+  .output-slot .out-assignment {
+    color: var(--accent2);
+    font-weight: 500;
+  }
+
+  .drop-zone {
+    border: 2px dashed #555;
+    border-radius: 6px;
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
+    font-size: 0.8rem;
+    transition: border-color 0.2s, background 0.2s;
+  }
+
+  .drop-zone.drag-over {
+    border-color: var(--accent2);
+    background: rgba(0, 180, 216, 0.1);
+  }
+
+  .tabs {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 16px;
+  }
+
+  .tab {
+    padding: 8px 16px;
+    background: var(--surface);
+    border: none;
+    color: var(--text-dim);
+    border-radius: 4px 4px 0 0;
+    cursor: pointer;
+    font-size: 0.85rem;
+  }
+
+  .tab.active {
+    background: var(--surface2);
+    color: var(--text);
+    border-bottom: 2px solid var(--accent);
+  }
+
+  .tab:hover { color: var(--text); }
+
+  .view-container { display: none; }
+  .view-container.active { display: block; }
+
+  @media print {
+    body { background: #fff; color: #000; }
+    header { position: static; background: #fff; border-bottom: 2px solid #000; }
+    .sidebar { display: none; }
+    .main-area { padding: 10px; }
+    .matrix-table th, .matrix-table td { border-color: #999; }
+    .matrix-cell.active { background: #000 !important; }
+    .matrix-cell.active::after { background: #fff; }
+    .channel-strip { background: #f0f0f0; border: 1px solid #ccc; }
+    .ch-name { background: #fff; color: #000; border: 1px solid #ccc; }
+    button { display: none; }
+    .tabs { display: none; }
+    .view-container { display: block !important; page-break-inside: avoid; margin-bottom: 20px; }
+    .output-section { background: #f5f5f5; }
+  }
+
+  .channel-detail-panel {
+    position: fixed;
+    right: -350px;
+    top: 52px;
+    width: 340px;
+    height: calc(100vh - 52px);
+    background: var(--surface);
+    border-left: 2px solid var(--accent);
+    padding: 20px;
+    transition: right 0.3s;
+    z-index: 50;
+    overflow-y: auto;
+  }
+
+  .channel-detail-panel.open { right: 0; }
+
+  .channel-detail-panel h3 {
+    color: var(--accent);
+    margin-bottom: 16px;
+  }
+
+  .detail-row {
+    margin-bottom: 12px;
+  }
+
+  .detail-row label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+  }
+
+  .detail-row input, .detail-row select {
+    width: 100%;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid #444;
+    padding: 6px 10px;
+    border-radius: 3px;
+  }
+
+  .color-options {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .color-opt {
+    width: 24px; height: 24px;
+    border-radius: 4px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 0.2s;
+  }
+  .color-opt:hover, .color-opt.selected { border-color: #fff; }
+
+  .close-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 1.2rem;
+    cursor: pointer;
+  }
+  .close-btn:hover { color: var(--text); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>
+    <span class="logo">MR</span>
+    Mixing Routing Editor
+  </h1>
+  <div class="header-actions">
+    <button onclick="exportJSON()">Projekt speichern</button>
+    <button onclick="window.print()" class="primary">Drucken / PDF</button>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <h2>Pult-Vorlage</h2>
+    <div class="preset-buttons">
+      <button class="preset-btn" onclick="loadPreset('x32')">Behringer X32 (32ch)</button>
+      <button class="preset-btn" onclick="loadPreset('x32compact')">X32 Compact (16+16)</button>
+      <button class="preset-btn" onclick="loadPreset('x32rack')">X32 Rack</button>
+      <button class="preset-btn" onclick="loadPreset('wing')">Behringer Wing (48ch)</button>
+      <button class="preset-btn" onclick="loadPreset('custom')">Benutzerdefiniert</button>
+    </div>
+
+    <h2>Konfiguration</h2>
+    <div class="config-group">
+      <div class="config-row">
+        <label>Input-Kanäle</label>
+        <input type="number" id="cfgChannels" value="32" min="1" max="64" onchange="rebuildAll()">
+      </div>
+      <div class="config-row">
+        <label>Aux-Returns</label>
+        <input type="number" id="cfgAux" value="8" min="0" max="8" onchange="rebuildAll()">
+      </div>
+      <div class="config-row">
+        <label>Mix-Busse</label>
+        <input type="number" id="cfgMixBus" value="16" min="0" max="24" onchange="rebuildAll()">
+      </div>
+      <div class="config-row">
+        <label>Effekt-Busse</label>
+        <input type="number" id="cfgFxBus" value="8" min="0" max="16" onchange="rebuildAll()">
+      </div>
+      <div class="config-row">
+        <label>Matrix-Busse</label>
+        <input type="number" id="cfgMatrix" value="6" min="0" max="12" onchange="rebuildAll()">
+      </div>
+      <div class="config-row">
+        <label>DCA-Gruppen</label>
+        <input type="number" id="cfgDCA" value="8" min="0" max="16" onchange="rebuildAll()">
+      </div>
+      <div class="config-row">
+        <label>Stereo Main</label>
+        <select id="cfgMain" onchange="rebuildAll()">
+          <option value="stereo">Stereo L/R</option>
+          <option value="mono">Mono C</option>
+          <option value="lcr">L/C/R</option>
+        </select>
+      </div>
+    </div>
+
+    <h2>Input-Quellen</h2>
+    <div class="config-group">
+      <div class="config-row">
+        <label>Lokale Inputs</label>
+        <input type="number" id="cfgLocalIn" value="32" min="0" max="32">
+      </div>
+      <div class="config-row">
+        <label>AES50-A Inputs</label>
+        <input type="number" id="cfgAES50A" value="48" min="0" max="48">
+      </div>
+      <div class="config-row">
+        <label>AES50-B Inputs</label>
+        <input type="number" id="cfgAES50B" value="48" min="0" max="48">
+      </div>
+      <div class="config-row">
+        <label>USB/Card Inputs</label>
+        <input type="number" id="cfgUSBIn" value="32" min="0" max="32">
+      </div>
+    </div>
+
+    <h2>Projekt</h2>
+    <div class="config-group">
+      <div class="detail-row">
+        <label>Projektname</label>
+        <input type="text" id="projectName" value="Neues Projekt" style="width:100%">
+      </div>
+      <div class="detail-row">
+        <label>Veranstaltung</label>
+        <input type="text" id="eventName" value="" placeholder="z.B. Konzert Stadtfest" style="width:100%">
+      </div>
+      <div class="detail-row">
+        <label>Datum</label>
+        <input type="date" id="eventDate" style="width:100%">
+      </div>
+    </div>
+  </aside>
+
+  <main class="main-area">
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('channels')">Kanäle</button>
+      <button class="tab" onclick="switchTab('routing')">Routing-Matrix</button>
+      <button class="tab" onclick="switchTab('outputs')">Outputs</button>
+    </div>
+
+    <!-- CHANNELS VIEW -->
+    <div id="view-channels" class="view-container active">
+      <div class="channels-section">
+        <span class="section-title" style="background:var(--bus-mix);color:#6fcf97;">Input-Kanäle</span>
+        <div class="channels-strip" id="inputChannels"></div>
+      </div>
+
+      <div class="channels-section">
+        <span class="section-title" style="background:var(--bus-fx);color:#bb86fc;">Aux Returns / FX Returns</span>
+        <div class="channels-strip" id="auxChannels"></div>
+      </div>
+    </div>
+
+    <!-- ROUTING MATRIX VIEW -->
+    <div id="view-routing" class="view-container">
+      <div class="routing-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--bus-mix)"></div> Mix-Bus</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--bus-fx)"></div> FX-Bus</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--bus-mtx)"></div> Matrix</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--bus-main)"></div> Main L/R</div>
+        <div class="legend-item">
+          <div style="width:14px;height:14px;background:var(--accent2);border-radius:50%;display:flex;align-items:center;justify-content:center;">
+            <div style="width:6px;height:6px;background:#fff;border-radius:50%;"></div>
+          </div>
+          Aktive Zuweisung
+        </div>
+      </div>
+      <div class="routing-matrix">
+        <table class="matrix-table" id="routingMatrix"></table>
+      </div>
+    </div>
+
+    <!-- OUTPUTS VIEW -->
+    <div id="view-outputs" class="view-container">
+      <div class="output-section">
+        <h3>Physische Outputs</h3>
+        <div class="output-grid" id="outputGrid"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Channel Detail Panel -->
+<div class="channel-detail-panel" id="detailPanel">
+  <button class="close-btn" onclick="closeDetail()">&times;</button>
+  <h3 id="detailTitle">Kanal 1</h3>
+  <div class="detail-row">
+    <label>Kanalname</label>
+    <input type="text" id="detailName" oninput="updateChannelName()">
+  </div>
+  <div class="detail-row">
+    <label>Input-Quelle</label>
+    <select id="detailSource" onchange="updateChannelSource()"></select>
+  </div>
+  <div class="detail-row">
+    <label>Farbe</label>
+    <div class="color-options" id="detailColors"></div>
+  </div>
+  <div class="detail-row">
+    <label>Phantom +48V</label>
+    <select id="detailPhantom">
+      <option value="off">Aus</option>
+      <option value="on">Ein</option>
+    </select>
+  </div>
+  <div class="detail-row">
+    <label>Notizen</label>
+    <input type="text" id="detailNotes" placeholder="z.B. SM58, DI-Box...">
+  </div>
+</div>
+
+<script>
+const COLORS = ['#e94560','#00b4d8','#6fcf97','#f5c542','#bb86fc','#ff9f43','#fff','#48dbfb'];
+const COLOR_NAMES = ['Rot','Cyan','Grün','Gelb','Lila','Orange','Weiß','Hellblau'];
+
+let state = {
+  channels: [],
+  routing: {},
+  outputs: [],
+  selectedChannel: null
+};
+
+function getConfig() {
+  return {
+    channels: parseInt(document.getElementById('cfgChannels').value),
+    aux: parseInt(document.getElementById('cfgAux').value),
+    mixBus: parseInt(document.getElementById('cfgMixBus').value),
+    fxBus: parseInt(document.getElementById('cfgFxBus').value),
+    matrix: parseInt(document.getElementById('cfgMatrix').value),
+    dca: parseInt(document.getElementById('cfgDCA').value),
+    main: document.getElementById('cfgMain').value,
+    localIn: parseInt(document.getElementById('cfgLocalIn').value),
+    aes50a: parseInt(document.getElementById('cfgAES50A').value),
+    aes50b: parseInt(document.getElementById('cfgAES50B').value),
+    usbIn: parseInt(document.getElementById('cfgUSBIn').value),
+  };
+}
+
+function getInputSources(cfg) {
+  let sources = [{value:'', label:'-- Nicht zugewiesen --'}];
+  for (let i = 1; i <= cfg.localIn; i++) sources.push({value:`local-${i}`, label:`Local In ${i}`});
+  for (let i = 1; i <= cfg.aes50a; i++) sources.push({value:`aes50a-${i}`, label:`AES50-A ${i}`});
+  for (let i = 1; i <= cfg.aes50b; i++) sources.push({value:`aes50b-${i}`, label:`AES50-B ${i}`});
+  for (let i = 1; i <= cfg.usbIn; i++) sources.push({value:`usb-${i}`, label:`USB/Card ${i}`});
+  return sources;
+}
+
+function loadPreset(name) {
+  const presets = {
+    x32:        { channels:32, aux:8, mixBus:16, fxBus:8, matrix:6, dca:8, main:'stereo', localIn:32, aes50a:48, aes50b:48, usbIn:32 },
+    x32compact: { channels:32, aux:8, mixBus:16, fxBus:8, matrix:6, dca:8, main:'stereo', localIn:16, aes50a:48, aes50b:48, usbIn:32 },
+    x32rack:    { channels:32, aux:8, mixBus:16, fxBus:8, matrix:6, dca:8, main:'stereo', localIn:16, aes50a:48, aes50b:48, usbIn:32 },
+    wing:       { channels:48, aux:8, mixBus:16, fxBus:8, matrix:8, dca:8, main:'stereo', localIn:8, aes50a:48, aes50b:48, usbIn:48 },
+    custom:     { channels:32, aux:8, mixBus:16, fxBus:8, matrix:6, dca:8, main:'stereo', localIn:32, aes50a:48, aes50b:48, usbIn:32 },
+  };
+  const p = presets[name];
+  document.getElementById('cfgChannels').value = p.channels;
+  document.getElementById('cfgAux').value = p.aux;
+  document.getElementById('cfgMixBus').value = p.mixBus;
+  document.getElementById('cfgFxBus').value = p.fxBus;
+  document.getElementById('cfgMatrix').value = p.matrix;
+  document.getElementById('cfgDCA').value = p.dca;
+  document.getElementById('cfgMain').value = p.main;
+  document.getElementById('cfgLocalIn').value = p.localIn;
+  document.getElementById('cfgAES50A').value = p.aes50a;
+  document.getElementById('cfgAES50B').value = p.aes50b;
+  document.getElementById('cfgUSBIn').value = p.usbIn;
+  rebuildAll();
+}
+
+function rebuildAll() {
+  const cfg = getConfig();
+  buildChannels(cfg);
+  buildMatrix(cfg);
+  buildOutputs(cfg);
+}
+
+function buildChannels(cfg) {
+  const container = document.getElementById('inputChannels');
+  const auxContainer = document.getElementById('auxChannels');
+  container.innerHTML = '';
+  auxContainer.innerHTML = '';
+
+  if (state.channels.length !== cfg.channels) {
+    state.channels = [];
+    for (let i = 0; i < cfg.channels; i++) {
+      state.channels.push({
+        name: `Ch ${i+1}`,
+        source: i < cfg.localIn ? `local-${i+1}` : '',
+        color: COLORS[i % COLORS.length],
+        phantom: false,
+        notes: ''
+      });
+    }
+  }
+
+  for (let i = 0; i < cfg.channels; i++) {
+    container.appendChild(createChannelStrip(i, state.channels[i], 'ch'));
+  }
+
+  for (let i = 0; i < cfg.aux; i++) {
+    auxContainer.appendChild(createChannelStrip(i, {
+      name: `Aux ${i+1}`,
+      source: '',
+      color: COLORS[4],
+      phantom: false,
+      notes: ''
+    }, 'aux'));
+  }
+}
+
+function createChannelStrip(index, ch, type) {
+  const div = document.createElement('div');
+  div.className = 'channel-strip';
+  div.draggable = true;
+  div.dataset.index = index;
+  div.dataset.type = type;
+
+  div.addEventListener('click', () => openDetail(index, type));
+  div.addEventListener('dragstart', e => {
+    div.classList.add('dragging');
+    e.dataTransfer.setData('text/plain', JSON.stringify({index, type}));
+  });
+  div.addEventListener('dragend', () => div.classList.remove('dragging'));
+
+  const meterH = 15 + Math.random() * 45;
+
+  div.innerHTML = `
+    <div class="ch-number">${type === 'ch' ? 'CH' : 'AUX'} ${index + 1}</div>
+    <div class="ch-color" style="background:${ch.color}"></div>
+    <input class="ch-name" value="${ch.name}"
+      onclick="event.stopPropagation()"
+      onchange="state.channels[${index}].name=this.value">
+    <select class="ch-input-select" onclick="event.stopPropagation()"
+      onchange="state.channels[${index}].source=this.value" title="Input-Quelle">
+      ${buildSourceOptions(ch.source)}
+    </select>
+    <div style="display:flex;gap:4px;align-items:flex-end;">
+      <div class="ch-fader-track"><div class="ch-fader-knob"></div></div>
+      <div class="ch-meter"><div class="ch-meter-fill" style="height:${meterH}%"></div></div>
+    </div>
+  `;
+  return div;
+}
+
+function buildSourceOptions(selected) {
+  const cfg = getConfig();
+  const sources = getInputSources(cfg);
+  return sources.map(s =>
+    `<option value="${s.value}" ${s.value === selected ? 'selected' : ''}>${s.label}</option>`
+  ).join('');
+}
+
+function buildMatrix(cfg) {
+  const table = document.getElementById('routingMatrix');
+  const buses = [];
+
+  for (let i = 1; i <= cfg.mixBus; i++) buses.push({id:`mix${i}`, label:`Mix ${i}`, type:'mix'});
+  for (let i = 1; i <= cfg.fxBus; i++) buses.push({id:`fx${i}`, label:`FX ${i}`, type:'fx'});
+  for (let i = 1; i <= cfg.matrix; i++) buses.push({id:`mtx${i}`, label:`Mtx ${i}`, type:'mtx'});
+  buses.push({id:'mainL', label:'Main L', type:'main'});
+  buses.push({id:'mainR', label:'Main R', type:'main'});
+
+  let html = '<thead><tr><th class="row-header">Kanal</th>';
+  buses.forEach(b => {
+    html += `<th class="bus-header-${b.type}" title="${b.label}">${b.label}</th>`;
+  });
+  html += '</tr></thead><tbody>';
+
+  for (let i = 0; i < cfg.channels; i++) {
+    const chName = state.channels[i] ? state.channels[i].name : `Ch ${i+1}`;
+    html += `<tr><td class="row-header">Ch ${i+1} - ${chName}</td>`;
+    buses.forEach(b => {
+      const key = `ch${i}-${b.id}`;
+      const active = state.routing[key] ? 'active' : '';
+      html += `<td class="matrix-cell ${active}" data-key="${key}" onclick="toggleRouting('${key}', this)"></td>`;
+    });
+    html += '</tr>';
+  }
+
+  for (let i = 0; i < cfg.aux; i++) {
+    html += `<tr><td class="row-header">Aux ${i+1}</td>`;
+    buses.forEach(b => {
+      const key = `aux${i}-${b.id}`;
+      const active = state.routing[key] ? 'active' : '';
+      html += `<td class="matrix-cell ${active}" data-key="${key}" onclick="toggleRouting('${key}', this)"></td>`;
+    });
+    html += '</tr>';
+  }
+
+  html += '</tbody>';
+  table.innerHTML = html;
+}
+
+function toggleRouting(key, cell) {
+  state.routing[key] = !state.routing[key];
+  cell.classList.toggle('active');
+}
+
+function buildOutputs(cfg) {
+  const grid = document.getElementById('outputGrid');
+  let html = '';
+
+  const outputs = [];
+  for (let i = 1; i <= 16; i++) outputs.push({id:`out${i}`, label:`Output ${i}`});
+  for (let i = 1; i <= 6; i++) outputs.push({id:`aes50a-out${i}`, label:`AES50-A Out ${i}`});
+  for (let i = 1; i <= 6; i++) outputs.push({id:`aes50b-out${i}`, label:`AES50-B Out ${i}`});
+
+  const busOptions = [];
+  busOptions.push('<option value="">-- Frei --</option>');
+  busOptions.push('<option value="mainL">Main L</option>');
+  busOptions.push('<option value="mainR">Main R</option>');
+  for (let i = 1; i <= cfg.mixBus; i++) busOptions.push(`<option value="mix${i}">Mix ${i}</option>`);
+  for (let i = 1; i <= cfg.fxBus; i++) busOptions.push(`<option value="fx${i}">FX ${i}</option>`);
+  for (let i = 1; i <= cfg.matrix; i++) busOptions.push(`<option value="mtx${i}">Matrix ${i}</option>`);
+  const optionsStr = busOptions.join('');
+
+  outputs.forEach(o => {
+    html += `<div class="output-slot">
+      <div class="out-label">${o.label}</div>
+      <select style="font-size:0.75rem;background:var(--bg);color:var(--text);border:1px solid #444;border-radius:2px;padding:2px;">
+        ${optionsStr}
+      </select>
+    </div>`;
+  });
+
+  grid.innerHTML = html;
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.view-container').forEach(v => v.classList.remove('active'));
+  document.querySelector(`.tab[onclick="switchTab('${name}')"]`).classList.add('active');
+  document.getElementById(`view-${name}`).classList.add('active');
+}
+
+function openDetail(index, type) {
+  state.selectedChannel = { index, type };
+  const panel = document.getElementById('detailPanel');
+  const ch = state.channels[index];
+  if (!ch) return;
+
+  document.getElementById('detailTitle').textContent = `${type === 'ch' ? 'Kanal' : 'Aux'} ${index + 1}`;
+  document.getElementById('detailName').value = ch.name;
+  document.getElementById('detailNotes').value = ch.notes || '';
+  document.getElementById('detailPhantom').value = ch.phantom ? 'on' : 'off';
+
+  const sourceSelect = document.getElementById('detailSource');
+  const cfg = getConfig();
+  const sources = getInputSources(cfg);
+  sourceSelect.innerHTML = sources.map(s =>
+    `<option value="${s.value}" ${s.value === ch.source ? 'selected' : ''}>${s.label}</option>`
+  ).join('');
+
+  const colorDiv = document.getElementById('detailColors');
+  colorDiv.innerHTML = COLORS.map((c, i) =>
+    `<div class="color-opt ${ch.color === c ? 'selected' : ''}"
+          style="background:${c}"
+          title="${COLOR_NAMES[i]}"
+          onclick="setChannelColor(${index}, '${c}', this)"></div>`
+  ).join('');
+
+  panel.classList.add('open');
+}
+
+function closeDetail() {
+  document.getElementById('detailPanel').classList.remove('open');
+  state.selectedChannel = null;
+}
+
+function updateChannelName() {
+  if (!state.selectedChannel) return;
+  const { index } = state.selectedChannel;
+  state.channels[index].name = document.getElementById('detailName').value;
+  rebuildAll();
+}
+
+function updateChannelSource() {
+  if (!state.selectedChannel) return;
+  const { index } = state.selectedChannel;
+  state.channels[index].source = document.getElementById('detailSource').value;
+}
+
+function setChannelColor(index, color, el) {
+  state.channels[index].color = color;
+  document.querySelectorAll('#detailColors .color-opt').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+  rebuildAll();
+}
+
+function exportJSON() {
+  const data = {
+    project: document.getElementById('projectName').value,
+    event: document.getElementById('eventName').value,
+    date: document.getElementById('eventDate').value,
+    config: getConfig(),
+    channels: state.channels,
+    routing: state.routing
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${data.project.replace(/\s+/g, '_')}.json`;
+  a.click();
+}
+
+// Init
+document.getElementById('eventDate').value = new Date().toISOString().split('T')[0];
+rebuildAll();
+</script>
+
+</body>
+</html>
