@@ -271,8 +271,11 @@
 
   .routing-matrix {
     margin-top: 20px;
-    overflow-x: auto;
+    overflow: auto;
+    max-height: calc(100vh - 190px);
   }
+  .matrix-table thead tr:nth-child(2) th { top: 27px; }
+  .matrix-table th.sub-head { position: static; }
 
   .matrix-table {
     border-collapse: collapse;
@@ -1236,12 +1239,16 @@ function buildMatrix(cfg) {
 
   // Mix bus rows → only Matrix + Main columns active, rest grayed
   if (cfg.mixBus > 0) {
-    html += `<tr><td colspan="${buses.length+1}" style="background:#111;color:#666;font-size:0.7rem;padding:2px 6px;">Mix-Busse → Matrix / Main</td></tr>`;
+    html += '<tr><th class="row-header sub-head" style="background:#111;color:#888">Mix-Busse &rarr;</th>';
+    buses.forEach(b => {
+      html += `<th class="sub-head bus-header-${b.type}" data-bus="${b.id}" title="${b.label}">${b.label}</th>`;
+    });
+    html += '</tr>';
     for (let i = 0; i < cfg.mixBus; i++) {
       const name = state.mixBuses[i] && state.mixBuses[i].name ? state.mixBuses[i].name : `Mix ${i+1}`;
       html += `<tr style="background:rgba(0,120,100,0.08)"><td class="row-header" data-mixrow="${i}" style="border-left:3px solid var(--bus-mix)">${name}</td>`;
       buses.forEach(b => {
-        if (b.type === 'mtx' || b.type === 'main') {
+        if (b.id !== `mix${i+1}`) {
           const key = `mixrow${i}-${b.id}`;
           const active = state.routing[key] ? 'active' : '';
           html += `<td class="matrix-cell ${active}" data-key="${key}" onclick="toggleRouting('${key}', this)"></td>`;
@@ -1263,8 +1270,9 @@ function setBusName(arr, idx, value) {
   const isMix = arr === 'mixBuses';
   const id = (isMix ? 'mix' : 'mtx') + (idx + 1);
   const label = value || (isMix ? `Mix ${idx+1}` : `Mtx ${idx+1}`);
-  const th = document.querySelector(`#routingMatrix th[data-bus="${id}"]`);
-  if (th) { th.textContent = label; th.title = label; }
+  document.querySelectorAll(`#routingMatrix th[data-bus="${id}"]`).forEach(th => {
+    th.textContent = label; th.title = label;
+  });
   if (isMix) {
     const rh = document.querySelector(`#routingMatrix td[data-mixrow="${idx}"]`);
     if (rh) rh.textContent = label;
