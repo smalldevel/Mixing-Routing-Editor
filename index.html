@@ -34,6 +34,8 @@
     min-height: 100vh;
   }
 
+  #projectTitle { flex:1; text-align:center; font-weight:600; font-size:1rem; padding:0 16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #projectTitle small { color: var(--text-dim); font-weight:400; margin-left:8px; }
   header {
     background: var(--surface);
     padding: 12px 24px;
@@ -548,9 +550,11 @@
     <span class="logo">MR</span>
     Mixing Routing Editor
   </h1>
+  <div id="projectTitle" title="Aktuelles Projekt"></div>
   <div class="header-actions">
-    <button onclick="exportJSON()">Projekt speichern</button>
-    <button onclick="document.getElementById('importFileInput').click()">Projekt laden</button>
+    <button id="saveBtn" onclick="saveProject(false)">Speichern</button>
+    <button onclick="saveProject(true)">Speichern unter</button>
+    <button onclick="openProject()">Projekt laden</button>
     <input type="file" id="importFileInput" accept=".json" style="display:none" onchange="importJSON(this)">
     <button onclick="window.print()" class="primary">Drucken / PDF</button>
   </div>
@@ -644,7 +648,7 @@
     <div class="config-group">
       <div class="detail-row">
         <label>Projektname</label>
-        <input type="text" id="projectName" value="Neues Projekt" style="width:100%">
+        <input type="text" id="projectName" value="Neues Projekt" style="width:100%" oninput="updateProjectTitle()">
       </div>
       <div class="detail-row">
         <label>Veranstaltung</label>
@@ -1450,13 +1454,44 @@ function setChannelColor(index, color, el) {
   rebuildAll();
 }
 
+let fileHandle = null;
+let fileName = '';
+
+function updateProjectTitle() {
+  const name = document.getElementById('projectName').value || 'Ohne Namen';
+  const t = document.getElementById('projectTitle');
+  t.textContent = name;
+  if (fileName) {
+    const sm = document.createElement('small');
+    sm.textContent = fileName;
+    t.appendChild(sm);
+  }
+}
+
+async function openProject() {
+  if (window.showOpenFilePicker) {
+    try {
+      const [h] = await showOpenFilePicker({types:[{description:'Projekt', accept:{'application/json':['.json']}}]});
+      const file = await h.getFile();
+      loadProjectText(await file.text(), h, file.name);
+    } catch (e) { if (e.name !== 'AbortError') alert('Fehler beim Öffnen: ' + e.message); }
+  } else {
+    document.getElementById('importFileInput').click();
+  }
+}
+
 function importJSON(input) {
   const file = input.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = e => { loadProjectText(e.target.result, null, file.name); input.value = ''; };
+  reader.readAsText(file);
+}
+
+function loadProjectText(text, handle, name) {
+  {
     try {
-      const data = JSON.parse(e.target.result);
+      const data = JSON.parse(text);
       if (data.project) document.getElementById('projectName').value = data.project;
       if (data.event)   document.getElementById('eventName').value   = data.event;
       if (data.date)    document.getElementById('eventDate').value    = data.date;
@@ -1475,17 +1510,18 @@ function importJSON(input) {
       state.mixBuses     = data.mixBuses     || [];
       state.matrixBuses  = data.matrixBuses  || [];
       state.busNames     = data.busNames     || {};
+      fileHandle = handle;
+      fileName = name;
       rebuildAll();
+      updateProjectTitle();
     } catch(err) {
       alert('Fehler beim Laden: ' + err.message);
     }
-    input.value = '';
-  };
-  reader.readAsText(file);
+  }
 }
 
-function exportJSON() {
-  const data = {
+function projectData() {
+  return {
     project: document.getElementById('projectName').value,
     event: document.getElementById('eventName').value,
     date: document.getElementById('eventDate').value,
@@ -1496,11 +1532,35 @@ function exportJSON() {
     matrixBuses: state.matrixBuses,
     busNames: state.busNames
   };
-  const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `${data.project.replace(/\s+/g, '_')}.json`;
-  a.click();
+}
+
+async function saveProject(saveAs) {
+  const data = projectData();
+  const text = JSON.stringify(data, null, 2);
+  const suggested = `${(data.project || 'Projekt').replace(/\s+/g, '_')}.json`;
+  try {
+    if (window.showSaveFilePicker) {
+      if (saveAs || !fileHandle) {
+        fileHandle = await showSaveFilePicker({suggestedName: fileName || suggested, types:[{description:'Projekt', accept:{'application/json':['.json']}}]});
+        fileName = fileHandle.name;
+      }
+      const w = await fileHandle.createWritable();
+      await w.write(text);
+      await w.close();
+    } else {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([text], {type:'application/json'}));
+      a.download = fileName || suggested;
+      a.click();
+      fileName = a.download;
+    }
+    updateProjectTitle();
+    const btn = document.getElementById('saveBtn');
+    btn.textContent = 'Gespeichert';
+    setTimeout(() => btn.textContent = 'Speichern', 1500);
+  } catch (e) {
+    if (e.name !== 'AbortError') alert('Fehler beim Speichern: ' + e.message);
+  }
 }
 
 // Init
@@ -1508,6 +1568,7 @@ document.getElementById('eventDate').value = new Date().toISOString().split('T')
 buildPresetButtons();
 buildChannelPresetButtons();
 rebuildAll();
+updateProjectTitle();
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js');
