@@ -345,10 +345,11 @@
   .bus-header-mix { background: var(--bus-mix) !important; color: #6fcf97; }
   .bus-header-fx { background: var(--bus-fx) !important; color: #bb86fc; }
   .bus-header-mtx { background: var(--bus-mtx) !important; color: #f5c542; }
-  .matrix-table th.bus-used, .matrix-table td.bus-used { filter: brightness(1.8); box-shadow: inset 0 -3px 0 #00b4d8; }
+  .matrix-table th.bus-used, .matrix-table td.bus-used { filter: brightness(1.35); box-shadow: inset 0 -3px 0 #00b4d8; }
   .matrix-table th.bus-th { padding: 3px 4px; vertical-align: bottom; }
-  .bus-num { font-size: 0.6rem; font-weight: 400; opacity: 0.55; line-height: 1.1; margin-bottom: 2px; }
-  .bus-ctl { display: flex; justify-content: center; gap: 2px; margin-top: 3px; }
+  .bus-num { font-size: 0.75rem; font-weight: 700; line-height: 1.2; margin-bottom: 3px; }
+  .bus-ctl { display: flex; justify-content: center; gap: 2px; margin-top: 3px; opacity: 0.45; transition: opacity .15s; }
+  .bus-th:hover .bus-ctl { opacity: 1; }
   .bus-ctl button { background: rgba(0,0,0,0.3); color: inherit; border: 1px solid rgba(255,255,255,0.15); border-radius: 3px; font-size: 0.6rem; line-height: 1; padding: 2px 4px; cursor: pointer; }
   .bus-ctl button:hover:not(:disabled) { background: rgba(255,255,255,0.2); }
   .bus-ctl button:disabled { opacity: 0.25; cursor: default; }
