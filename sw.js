@@ -1,4 +1,4 @@
-const CACHE = 'mre-v1';
+const CACHE = 'mre-v2';
 const FILES = ['/', '/index.html', '/manifest.json', '/icon.png'];
 
 self.addEventListener('install', e => {
@@ -13,8 +13,14 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
+// Network first, cache as offline fallback
 self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET') return;
   e.respondWith(
-    caches.match(e.request).then(r => r || fetch(e.request))
+    fetch(e.request).then(r => {
+      const copy = r.clone();
+      caches.open(CACHE).then(c => c.put(e.request, copy));
+      return r;
+    }).catch(() => caches.match(e.request))
   );
 });
