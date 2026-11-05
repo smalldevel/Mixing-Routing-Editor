@@ -345,6 +345,12 @@
   .bus-header-fx { background: var(--bus-fx) !important; color: #bb86fc; }
   .bus-header-mtx { background: var(--bus-mtx) !important; color: #f5c542; }
   .matrix-table th.bus-used, .matrix-table td.bus-used { filter: brightness(1.8); box-shadow: inset 0 -3px 0 #00b4d8; }
+  .matrix-table th.bus-th { padding: 3px 4px; vertical-align: bottom; }
+  .bus-num { font-size: 0.6rem; font-weight: 400; opacity: 0.55; line-height: 1.1; margin-bottom: 2px; }
+  .bus-ctl { display: flex; justify-content: center; gap: 2px; margin-top: 3px; }
+  .bus-ctl button { background: rgba(0,0,0,0.3); color: inherit; border: 1px solid rgba(255,255,255,0.15); border-radius: 3px; font-size: 0.6rem; line-height: 1; padding: 2px 4px; cursor: pointer; }
+  .bus-ctl button:hover:not(:disabled) { background: rgba(255,255,255,0.2); }
+  .bus-ctl button:disabled { opacity: 0.25; cursor: default; }
   .matrix-table th.name-cell { padding: 2px; background: var(--surface); }
   .bus-name-input { width: 100%; min-width: 52px; box-sizing: border-box; font-size: 0.68rem; background: #1e1e3a; color: var(--text); border: 1px solid #444; border-radius: 3px; padding: 2px 3px; }
   div.output-slot.assigned { border-color: #00b4d8; background: rgba(0,180,216,0.12); }
@@ -1245,26 +1251,32 @@ function buildMatrix(cfg) {
   const custom = (arr, i) => (state[arr][i] && state[arr][i].name) || '';
   for (let i = 0; i < cfg.mixBus; i++) {
     const def = `Mix ${i+1}`;
-    buses.push({id:`mix${i+1}`, def, label: custom('mixBuses', i) || def, type:'mix'});
+    buses.push({n:i+1, of:cfg.mixBus, id:`mix${i+1}`, def, label: custom('mixBuses', i) || def, type:'mix'});
   }
   for (let i = 1; i <= cfg.fxBus; i++) {
     const def = `FX ${i}`, id = `fx${i}`;
-    buses.push({id, def, label: state.busNames[id] || def, type:'fx'});
+    buses.push({n:i, of:cfg.fxBus, id, def, label: state.busNames[id] || def, type:'fx'});
   }
   for (let i = 0; i < cfg.matrix; i++) {
     const def = `Mtx ${i+1}`;
-    buses.push({id:`mtx${i+1}`, def, label: custom('matrixBuses', i) || def, type:'mtx'});
+    buses.push({n:i+1, of:cfg.matrix, id:`mtx${i+1}`, def, label: custom('matrixBuses', i) || def, type:'mtx'});
   }
   getMainBuses(cfg).forEach(m => buses.push({id:m.id, def:m.def, label: state.busNames[m.id] || m.def, type:'main'}));
 
   let html = '<thead><tr><th class="row-header">Quelle / Ziel</th>';
   buses.forEach(b => {
-    html += `<th class="bus-header-${b.type}" data-bus="${b.id}" data-default="${b.def}" title="${b.label}">${b.label}</th>`;
-  });
-  html += '</tr><tr><th class="row-header" style="font-weight:400;color:#888">Name</th>';
-  buses.forEach(b => {
     const v = (b.label === b.def ? '' : b.label).replace(/"/g, '&quot;');
-    html += `<th class="name-cell"><input type="text" class="bus-name-input" value="${v}" placeholder="Name" oninput="setBusName('${b.id}',this.value)"></th>`;
+    const movable = b.type !== 'main';
+    const ctl = movable ? `<div class="bus-ctl">
+        <button title="Nach links" ${b.n === 1 ? 'disabled' : ''} onclick="moveBus('${b.type}',${b.n},-1)">&#9664;</button>
+        <button title="Löschen (Rest rückt auf)" onclick="deleteBus('${b.type}',${b.n})">&#10005;</button>
+        <button title="Nach rechts" ${b.n === b.of ? 'disabled' : ''} onclick="moveBus('${b.type}',${b.n},1)">&#9654;</button>
+      </div>` : '';
+    html += `<th class="bus-header-${b.type} bus-th" data-bus="${b.id}" data-default="${b.def}" title="${b.label}">
+      <div class="bus-num">${b.def}</div>
+      <input type="text" class="bus-name-input" value="${v}" placeholder="Name" oninput="setBusName('${b.id}',this.value)">
+      ${ctl}
+    </th>`;
   });
   html += '</tr></thead><tbody>';
 
@@ -1331,6 +1343,57 @@ function getMainBuses(cfg) {
   return out;
 }
 
+function remapBus(type, fn) {
+  const next = {};
+  Object.keys(state.routing).forEach(k => {
+    if (!state.routing[k]) return;
+    const d = k.indexOf('-');
+    let src = k.slice(0, d), dest = k.slice(d + 1);
+    const ms = type === 'mix' && src.match(/^mixrow(\d+)$/);
+    if (ms) { const nn = fn(+ms[1] + 1); if (nn == null) return; src = 'mixrow' + (nn - 1); }
+    const md = dest.match(/^(mix|fx|mtx)(\d+)$/);
+    if (md && md[1] === type) { const nn = fn(+md[2]); if (nn == null) return; dest = type + nn; }
+    next[src + '-' + dest] = true;
+  });
+  state.routing = next;
+
+  const cfg = getConfig();
+  if (type === 'fx') {
+    const names = {};
+    Object.keys(state.busNames).forEach(id => {
+      const m = id.match(/^fx(\d+)$/);
+      if (!m) { names[id] = state.busNames[id]; return; }
+      const nn = fn(+m[1]);
+      if (nn != null) names['fx' + nn] = state.busNames[id];
+    });
+    state.busNames = names;
+  } else {
+    const arr = type === 'mix' ? 'mixBuses' : 'matrixBuses';
+    const count = type === 'mix' ? cfg.mixBus : cfg.matrix;
+    const out = Array.from({length: count}, () => ({name: ''}));
+    state[arr].forEach((b, i) => {
+      const nn = fn(i + 1);
+      if (nn != null && nn >= 1 && nn <= count) out[nn - 1] = b;
+    });
+    state[arr] = out;
+  }
+  rebuildAll();
+}
+
+function moveBus(type, n, dir) {
+  const other = n + dir;
+  remapBus(type, x => x === n ? other : x === other ? n : x);
+}
+
+function deleteBus(type, n) {
+  const names = {mix:'Mix', fx:'FX', mtx:'Matrix'};
+  const cfg = getConfig();
+  const custom = type === 'fx' ? state.busNames['fx' + n]
+    : (state[type === 'mix' ? 'mixBuses' : 'matrixBuses'][n - 1] || {}).name;
+  if (!confirm(`${names[type]} ${n}${custom ? ' (' + custom + ')' : ''} löschen? Alle Zuweisungen gehen verloren, die folgenden Busse rücken auf.`)) return;
+  remapBus(type, x => x === n ? null : x > n ? x - 1 : x);
+}
+
 function setBusName(id, value) {
   let mixIdx = -1;
   const m = id.match(/^(mix|mtx)(\d+)$/);
@@ -1343,7 +1406,8 @@ function setBusName(id, value) {
   }
   document.querySelectorAll(`#routingMatrix th[data-bus="${id}"]`).forEach(th => {
     const label = value || th.dataset.default;
-    th.textContent = label; th.title = label;
+    th.title = label;
+    if (th.classList.contains('sub-head')) th.textContent = label;
   });
   if (mixIdx >= 0) {
     const rh = document.querySelector(`#routingMatrix td[data-mixrow="${mixIdx}"]`);
