@@ -664,6 +664,7 @@
 
     <!-- ROUTING MATRIX VIEW -->
     <div id="view-routing" class="view-container">
+      <div id="busNamesBar" style="display:flex;flex-wrap:wrap;gap:6px;padding:6px 8px;background:var(--surface);border-bottom:1px solid #333;font-size:0.72rem;"></div>
       <div class="routing-legend">
         <div class="legend-item"><div class="legend-dot" style="background:var(--bus-mix)"></div> Mix-Bus</div>
         <div class="legend-item"><div class="legend-dot" style="background:var(--bus-fx)"></div> FX-Bus</div>
@@ -728,7 +729,9 @@ let state = {
   channels: [],
   routing: {},
   outputs: [],
-  selectedChannel: null
+  selectedChannel: null,
+  mixBuses: [],   // [{name:''}]
+  matrixBuses: [] // [{name:''}]
 };
 
 function getConfig() {
@@ -1083,9 +1086,38 @@ function loadPreset(name) {
 
 function rebuildAll() {
   const cfg = getConfig();
+  // Sync bus name arrays to current config
+  while (state.mixBuses.length < cfg.mixBus) state.mixBuses.push({name:''});
+  state.mixBuses.length = cfg.mixBus;
+  while (state.matrixBuses.length < cfg.matrix) state.matrixBuses.push({name:''});
+  state.matrixBuses.length = cfg.matrix;
   buildChannels(cfg);
+  buildBusNamesBar(cfg);
   buildMatrix(cfg);
   buildOutputs(cfg);
+}
+
+function buildBusNamesBar(cfg) {
+  const bar = document.getElementById('busNamesBar');
+  if (!cfg.mixBus && !cfg.matrix) { bar.style.display='none'; return; }
+  bar.style.display = 'flex';
+  let html = '<span style="color:#888;align-self:center;margin-right:4px;">Bus-Namen:</span>';
+  for (let i = 0; i < cfg.mixBus; i++) {
+    const v = state.mixBuses[i] ? state.mixBuses[i].name : '';
+    html += `<input type="text" placeholder="Mix ${i+1}" value="${v.replace(/"/g,'&quot;')}"
+      style="width:72px;font-size:0.7rem;background:#1e1e3a;color:var(--text);border:1px solid var(--bus-mix);border-radius:3px;padding:2px 4px;"
+      oninput="state.mixBuses[${i}]={name:this.value};buildMatrix(getConfig())">`;
+  }
+  if (cfg.matrix) {
+    html += '<span style="color:#888;margin:0 4px;align-self:center;">|</span>';
+    for (let i = 0; i < cfg.matrix; i++) {
+      const v = state.matrixBuses[i] ? state.matrixBuses[i].name : '';
+      html += `<input type="text" placeholder="Mtx ${i+1}" value="${v.replace(/"/g,'&quot;')}"
+        style="width:72px;font-size:0.7rem;background:#1e1e3a;color:var(--text);border:1px solid var(--bus-mtx, #e0a000);border-radius:3px;padding:2px 4px;"
+        oninput="state.matrixBuses[${i}]={name:this.value};buildMatrix(getConfig())">`;
+    }
+  }
+  bar.innerHTML = html;
 }
 
 function buildChannels(cfg) {
@@ -1168,21 +1200,31 @@ function buildMatrix(cfg) {
   const table = document.getElementById('routingMatrix');
   const buses = [];
 
-  for (let i = 1; i <= cfg.mixBus; i++) buses.push({id:`mix${i}`, label:`Mix ${i}`, type:'mix'});
+  for (let i = 0; i < cfg.mixBus; i++) {
+    const name = state.mixBuses[i] && state.mixBuses[i].name ? state.mixBuses[i].name : `Mix ${i+1}`;
+    buses.push({id:`mix${i+1}`, label: name, type:'mix'});
+  }
   for (let i = 1; i <= cfg.fxBus; i++) buses.push({id:`fx${i}`, label:`FX ${i}`, type:'fx'});
-  for (let i = 1; i <= cfg.matrix; i++) buses.push({id:`mtx${i}`, label:`Mtx ${i}`, type:'mtx'});
+  for (let i = 0; i < cfg.matrix; i++) {
+    const name = state.matrixBuses[i] && state.matrixBuses[i].name ? state.matrixBuses[i].name : `Mtx ${i+1}`;
+    buses.push({id:`mtx${i+1}`, label: name, type:'mtx'});
+  }
   buses.push({id:'mainL', label:'Main L', type:'main'});
   buses.push({id:'mainR', label:'Main R', type:'main'});
 
-  let html = '<thead><tr><th class="row-header">Kanal</th>';
+  // Columns only valid for Mix bus rows (Mtx + Main)
+  const mixRowBuses = buses.filter(b => b.type === 'mtx' || b.type === 'main');
+
+  let html = '<thead><tr><th class="row-header">Quelle / Ziel</th>';
   buses.forEach(b => {
     html += `<th class="bus-header-${b.type}" title="${b.label}">${b.label}</th>`;
   });
   html += '</tr></thead><tbody>';
 
+  // Input channel rows
   for (let i = 0; i < cfg.channels; i++) {
     const chName = state.channels[i] ? state.channels[i].name : `Ch ${i+1}`;
-    html += `<tr><td class="row-header">Ch ${i+1} - ${chName}</td>`;
+    html += `<tr><td class="row-header">Ch ${i+1}${chName ? ' – '+chName : ''}</td>`;
     buses.forEach(b => {
       const key = `ch${i}-${b.id}`;
       const active = state.routing[key] ? 'active' : '';
@@ -1191,6 +1233,7 @@ function buildMatrix(cfg) {
     html += '</tr>';
   }
 
+  // Aux return rows
   for (let i = 0; i < cfg.aux; i++) {
     html += `<tr><td class="row-header">Aux ${i+1}</td>`;
     buses.forEach(b => {
@@ -1199,6 +1242,25 @@ function buildMatrix(cfg) {
       html += `<td class="matrix-cell ${active}" data-key="${key}" onclick="toggleRouting('${key}', this)"></td>`;
     });
     html += '</tr>';
+  }
+
+  // Mix bus rows → only Matrix + Main columns active, rest grayed
+  if (cfg.mixBus > 0) {
+    html += `<tr><td colspan="${buses.length+1}" style="background:#111;color:#666;font-size:0.7rem;padding:2px 6px;">Mix-Busse → Matrix / Main</td></tr>`;
+    for (let i = 0; i < cfg.mixBus; i++) {
+      const name = state.mixBuses[i] && state.mixBuses[i].name ? state.mixBuses[i].name : `Mix ${i+1}`;
+      html += `<tr style="background:rgba(0,120,100,0.08)"><td class="row-header" style="border-left:3px solid var(--bus-mix)">${name}</td>`;
+      buses.forEach(b => {
+        if (b.type === 'mtx' || b.type === 'main') {
+          const key = `mixrow${i}-${b.id}`;
+          const active = state.routing[key] ? 'active' : '';
+          html += `<td class="matrix-cell ${active}" data-key="${key}" onclick="toggleRouting('${key}', this)"></td>`;
+        } else {
+          html += `<td class="matrix-cell" style="background:#0a0a1a;cursor:default;opacity:0.3"></td>`;
+        }
+      });
+      html += '</tr>';
+    }
   }
 
   html += '</tbody>';
@@ -1310,7 +1372,9 @@ function exportJSON() {
     date: document.getElementById('eventDate').value,
     config: getConfig(),
     channels: state.channels,
-    routing: state.routing
+    routing: state.routing,
+    mixBuses: state.mixBuses,
+    matrixBuses: state.matrixBuses
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
   const a = document.createElement('a');
