@@ -337,6 +337,10 @@
   .bus-header-mix { background: var(--bus-mix) !important; color: #6fcf97; }
   .bus-header-fx { background: var(--bus-fx) !important; color: #bb86fc; }
   .bus-header-mtx { background: var(--bus-mtx) !important; color: #f5c542; }
+  .matrix-table th.bus-used, .matrix-table td.bus-used { filter: brightness(1.8); box-shadow: inset 0 -3px 0 #00b4d8; }
+  .matrix-table th.name-cell { padding: 2px; background: var(--surface); }
+  .bus-name-input { width: 100%; min-width: 52px; box-sizing: border-box; font-size: 0.68rem; background: #1e1e3a; color: var(--text); border: 1px solid #444; border-radius: 3px; padding: 2px 3px; }
+  div.output-slot.assigned { border-color: #00b4d8; background: rgba(0,180,216,0.12); }
   .bus-header-main { background: var(--bus-main) !important; color: var(--accent); }
 
   .routing-legend {
@@ -666,7 +670,6 @@
 
     <!-- ROUTING MATRIX VIEW -->
     <div id="view-routing" class="view-container">
-      <div id="busNamesBar" style="display:flex;flex-wrap:wrap;gap:6px;padding:6px 8px;background:var(--surface);border-bottom:1px solid #333;font-size:0.72rem;"></div>
       <div class="routing-legend">
         <div class="legend-item"><div class="legend-dot" style="background:var(--bus-mix)"></div> Mix-Bus</div>
         <div class="legend-item"><div class="legend-dot" style="background:var(--bus-fx)"></div> FX-Bus</div>
@@ -1094,32 +1097,8 @@ function rebuildAll() {
   while (state.matrixBuses.length < cfg.matrix) state.matrixBuses.push({name:''});
   state.matrixBuses.length = cfg.matrix;
   buildChannels(cfg);
-  buildBusNamesBar(cfg);
   buildMatrix(cfg);
   buildOutputs(cfg);
-}
-
-function buildBusNamesBar(cfg) {
-  const bar = document.getElementById('busNamesBar');
-  if (!cfg.mixBus && !cfg.matrix) { bar.style.display='none'; return; }
-  bar.style.display = 'flex';
-  let html = '<span style="color:#888;align-self:center;margin-right:4px;">Bus-Namen:</span>';
-  for (let i = 0; i < cfg.mixBus; i++) {
-    const v = state.mixBuses[i] ? state.mixBuses[i].name : '';
-    html += `<input type="text" placeholder="Mix ${i+1}" value="${v.replace(/"/g,'&quot;')}"
-      style="width:72px;font-size:0.7rem;background:#1e1e3a;color:var(--text);border:1px solid var(--bus-mix);border-radius:3px;padding:2px 4px;"
-      oninput="state.mixBuses[${i}]={name:this.value};buildMatrix(getConfig())">`;
-  }
-  if (cfg.matrix) {
-    html += '<span style="color:#888;margin:0 4px;align-self:center;">|</span>';
-    for (let i = 0; i < cfg.matrix; i++) {
-      const v = state.matrixBuses[i] ? state.matrixBuses[i].name : '';
-      html += `<input type="text" placeholder="Mtx ${i+1}" value="${v.replace(/"/g,'&quot;')}"
-        style="width:72px;font-size:0.7rem;background:#1e1e3a;color:var(--text);border:1px solid var(--bus-mtx, #e0a000);border-radius:3px;padding:2px 4px;"
-        oninput="state.matrixBuses[${i}]={name:this.value};buildMatrix(getConfig())">`;
-    }
-  }
-  bar.innerHTML = html;
 }
 
 function buildChannels(cfg) {
@@ -1219,7 +1198,16 @@ function buildMatrix(cfg) {
 
   let html = '<thead><tr><th class="row-header">Quelle / Ziel</th>';
   buses.forEach(b => {
-    html += `<th class="bus-header-${b.type}" title="${b.label}">${b.label}</th>`;
+    html += `<th class="bus-header-${b.type}" data-bus="${b.id}" title="${b.label}">${b.label}</th>`;
+  });
+  html += '</tr><tr><th class="row-header" style="font-weight:400;color:#888">Name</th>';
+  buses.forEach(b => {
+    const m = b.id.match(/^(mix|mtx)(\d+)$/);
+    if (!m) { html += '<th class="name-cell"></th>'; return; }
+    const arr = m[1] === 'mix' ? 'mixBuses' : 'matrixBuses';
+    const idx = m[2] - 1;
+    const v = (state[arr][idx] && state[arr][idx].name || '').replace(/"/g, '&quot;');
+    html += `<th class="name-cell"><input type="text" class="bus-name-input" value="${v}" placeholder="Name" oninput="setBusName('${arr}',${idx},this.value)"></th>`;
   });
   html += '</tr></thead><tbody>';
 
@@ -1251,7 +1239,7 @@ function buildMatrix(cfg) {
     html += `<tr><td colspan="${buses.length+1}" style="background:#111;color:#666;font-size:0.7rem;padding:2px 6px;">Mix-Busse → Matrix / Main</td></tr>`;
     for (let i = 0; i < cfg.mixBus; i++) {
       const name = state.mixBuses[i] && state.mixBuses[i].name ? state.mixBuses[i].name : `Mix ${i+1}`;
-      html += `<tr style="background:rgba(0,120,100,0.08)"><td class="row-header" style="border-left:3px solid var(--bus-mix)">${name}</td>`;
+      html += `<tr style="background:rgba(0,120,100,0.08)"><td class="row-header" data-mixrow="${i}" style="border-left:3px solid var(--bus-mix)">${name}</td>`;
       buses.forEach(b => {
         if (b.type === 'mtx' || b.type === 'main') {
           const key = `mixrow${i}-${b.id}`;
@@ -1267,11 +1255,44 @@ function buildMatrix(cfg) {
 
   html += '</tbody>';
   table.innerHTML = html;
+  refreshUsed();
+}
+
+function setBusName(arr, idx, value) {
+  state[arr][idx] = {name: value};
+  const isMix = arr === 'mixBuses';
+  const id = (isMix ? 'mix' : 'mtx') + (idx + 1);
+  const label = value || (isMix ? `Mix ${idx+1}` : `Mtx ${idx+1}`);
+  const th = document.querySelector(`#routingMatrix th[data-bus="${id}"]`);
+  if (th) { th.textContent = label; th.title = label; }
+  if (isMix) {
+    const rh = document.querySelector(`#routingMatrix td[data-mixrow="${idx}"]`);
+    if (rh) rh.textContent = label;
+  }
+}
+
+function refreshUsed() {
+  const used = new Set(), usedRows = new Set();
+  Object.keys(state.routing).forEach(k => {
+    if (!state.routing[k]) return;
+    const dash = k.indexOf('-');
+    used.add(k.slice(dash + 1));
+    const m = k.slice(0, dash).match(/^mixrow(\d+)$/);
+    if (m) usedRows.add(+m[1]);
+  });
+  document.querySelectorAll('#routingMatrix th[data-bus]').forEach(th => {
+    th.classList.toggle('bus-used', used.has(th.dataset.bus));
+  });
+  document.querySelectorAll('#routingMatrix td[data-mixrow]').forEach(td => {
+    const i = +td.dataset.mixrow;
+    td.classList.toggle('bus-used', usedRows.has(i) || used.has('mix' + (i + 1)));
+  });
 }
 
 function toggleRouting(key, cell) {
   state.routing[key] = !state.routing[key];
   cell.classList.toggle('active');
+  refreshUsed();
 }
 
 function buildOutputs(cfg) {
@@ -1297,7 +1318,7 @@ function buildOutputs(cfg) {
   outputs.forEach(o => {
     html += `<div class="output-slot">
       <div class="out-label">${o.label}</div>
-      <select style="font-size:0.75rem;background:var(--bg);color:var(--text);border:1px solid #444;border-radius:2px;padding:2px;">
+      <select onchange="this.parentElement.classList.toggle('assigned', !!this.value)" style="font-size:0.75rem;background:var(--bg);color:var(--text);border:1px solid #444;border-radius:2px;padding:2px;">
         ${optionsStr}
       </select>
     </div>`;
